@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block body %}
+<style>
+    body {
+        background: linear-gradient(135deg, #6C63FF, #3F3D56);
+        color: #333;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .timeout-card {
+        background: #ffffff;
+        border-radius: 15px;
+        padding: 40px 30px;
+        max-width: 450px;
+        width: 90%;
+        box-shadow: 0 15px 25px rgba(0, 0, 0, 0.2);
+        text-align: center;
+        animation: fadeIn 0.5s ease-in-out;
+    }
+
+    .timeout-card h3 {
+        color: #ff4b5c;
+        margin-bottom: 15px;
+    }
+
+    .timeout-card p {
+        font-size: 18px;
+        margin-bottom: 25px;
+    }
+
+    .countdown {
+        font-size: 28px;
+        font-weight: bold;
+        color: #6C63FF;
+    }
+
+    @keyframes fadeIn {
+        0% { opacity: 0; transform: translateY(-20px); }
+        100% { opacity: 1; transform: translateY(0); }
+    }
+</style>
+
+<div class="timeout-card">
+    <h3>🚫 Too Many Failed Attempts!</h3>
+    <p>Please wait <span class="countdown" id="countdown">{{ remaining }}</span> seconds before trying again.</p>
+    <p class="small">After the countdown, you will be redirected to the login page automatically.</p>
+</div>
+
+<script>
+    let countdown = {{ remaining }};
+    const timer = setInterval(() => {
+        countdown--;
+        document.getElementById('countdown').textContent = countdown;
+        if (countdown <= 0) {
+            clearInterval(timer);
+            window.location.href = '/'; // redirect to login page
+        }
+    }, 1000);
+</script>
+{% endblock %}
+
+{% comment %} {% extends 'base.html' %}
+{% block body %}
+<div class="container text-center mt-5">
+    <h3>Too many failed login attempts!</h3>
+    <p>Please wait <span id="countdown">{{ remaining }}</span> seconds before trying again.</p>
+</div>
+
+<script>
+let countdown = {{ remaining }};
+const timer = setInterval(() => {
+    countdown--;
+    document.getElementById('countdown').textContent = countdown;
+    if(countdown <= 0) {
+        clearInterval(timer);
+        window.location.href = '/'; // redirect to login
+    }
+}, 1000);
+</script>
+{% endblock %} {% endcomment %}

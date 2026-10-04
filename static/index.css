@@ -1,0 +1,188 @@
+/* General Body */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    margin: 0;
+    padding: 0;
+}
+
+/* Sidebar */
+#layoutSidenav {
+    display: flex;
+    min-height: 100vh;
+}
+
+#layoutSidenav_nav {
+    width: 250px;
+    flex-shrink: 0;
+}
+
+.sb-sidenav-dark {
+    background-color: #212529;
+    min-height: 100vh;
+    color: #adb5bd;
+    padding-top: 20px;
+}
+
+.sb-sidenav-dark .nav-link {
+    color: #adb5bd;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+}
+
+.sb-sidenav-dark .nav-link:hover {
+    color: #fff;
+    background-color: #495057;
+    border-radius: 5px;
+}
+
+.sb-sidenav-dark .sb-sidenav-footer {
+    background-color: #343a40;
+    color: #fff;
+    padding: 15px;
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+}
+
+/* Main Content Area */
+#layoutSidenav_content {
+    flex: 1;
+    padding: 25px 30px;
+}
+
+/* Wallet Card */
+.card1 {
+    background-color: #fff;
+    border-radius: 12px;
+    padding: 25px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    margin-bottom: 30px;
+    transition: transform 0.2s;
+    max-width: 600px;
+}
+
+.card1:hover {
+    transform: translateY(-2px);
+}
+
+.card1 h4 {
+    margin-bottom: 15px;
+    font-weight: bold;
+}
+
+.card1 p {
+    margin: 8px 0;
+    font-size: 1rem;
+}
+
+.card1 p strong {
+    font-weight: bold;
+    color: #007bff;
+}
+
+/* Wallet Button */
+.card1 .b1 {
+    background: none;
+    border: none;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.card1 .b1 i {
+    transition: transform 0.2s;
+}
+
+.card1 .b1:hover i {
+    transform: scale(1.2);
+    color: #dc3545;
+}
+
+/* Table Styling */
+.table {
+    background-color: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+.table th, .table td {
+    vertical-align: middle !important;
+    text-align: center;
+    padding: 12px;
+}
+
+.table thead {
+    background-color: #343a40;
+    color: #fff;
+    font-weight: bold;
+}
+
+.table tbody tr:hover {
+    background-color: #f1f3f5;
+}
+
+/* Pagination */
+.pagination {
+    justify-content: flex-end;
+    margin-top: 10px;
+}
+
+/* Alerts */
+.alert {
+    margin-top: 15px;
+}
+
+/* Responsive Image */
+.img-responsive {
+    width: calc(100% - 270px); /* remaining screen after sidebar */
+    max-height: 500px;
+    object-fit: cover;
+    border-radius: 8px;
+    margin-bottom: 30px;
+}
+
+/* Responsive Design */
+@media (max-width: 992px) {
+    #layoutSidenav_nav {
+        width: 200px;
+    }
+
+    .card1 {
+        padding: 20px;
+    }
+
+    .card1 h4 {
+        font-size: 1.1rem;
+    }
+
+    .card1 p {
+        font-size: 0.95rem;
+    }
+}
+
+@media (max-width: 768px) {
+    #layoutSidenav {
+        flex-direction: column;
+    }
+
+    #layoutSidenav_nav {
+        width: 100%;
+        min-height: auto;
+    }
+
+    #layoutSidenav_content {
+        padding: 15px;
+    }
+
+    .img-responsive {
+        width: 100%;
+        height: auto;
+    }
+
+    .card1 .b1 {
+        display: block;
+        margin: 10px auto;
+    }
+}
