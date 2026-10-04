@@ -23,12 +23,37 @@ from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.core.mail import send_mail
 
+# Categories: expense and income each have their own list.
+# Add or remove a category here and the forms, filter and checks all follow.
+EXPENSE_CATEGORIES = [
+    "Food", "Groceries", "Travel", "Shopping", "Necessities",
+    "Entertainment", "Rent", "Bills", "Healthcare", "Others",
+]
+INCOME_CATEGORIES = ["Salary", "Gift", "Investment", "Others"]
+CATEGORY_MAP = {"Expense": EXPENSE_CATEGORIES, "Income": INCOME_CATEGORIES}
+
+# The "week" on the weekly page runs Sunday to Saturday.
+# Set this to False if you want Monday to Sunday instead.
+WEEK_STARTS_ON_SUNDAY = True
+
 # Create your views here.
 def home(request):
     if request.session.has_key('is_logged'):
         return redirect('/index')
     return render(request,'home/login.html')
    # return HttpResponse('This is home')
+def _starting_amount(user):
+    """One-time amounts entered at registration (savings + income)."""
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    return (profile.Savings or 0) + (profile.income or 0)
+
+
+def _overall_balance(user):
+    """Starting amount + every income and expense ever added (expenses are stored negative)."""
+    net = Addmoney_info.objects.filter(user=user).aggregate(Sum('quantity'))['quantity__sum'] or 0
+    return _starting_amount(user) + net
+
+
 def index(request):
     if request.session.has_key('is_logged'):
         user_id = request.session["user_id"]
@@ -42,13 +67,15 @@ def index(request):
         one_month_ago = todays_date - datetime.timedelta(days=5000)
         total_expense = addmoney_info.filter(add_money='Expense', Date__gte=one_month_ago).aggregate(Sum('quantity'))['quantity__sum'] or 0
         total_income = addmoney_info.filter(add_money='Income', Date__gte=one_month_ago).aggregate(Sum('quantity'))['quantity__sum'] or 0
-        current_income = total_expense+total_income
+        starting_amount = _starting_amount(user)
+        current_income = starting_amount + total_expense + total_income
         context = {
             # 'add_info' : addmoney_info,
            'page_obj' : page_obj,
            'total_expense': total_expense,
            'total_income' : total_income,
            'current_income':current_income,
+           'starting_amount': starting_amount,
         }
     #if request.session.has_key('is_logged'):
         return render(request,'home/index.html',context)
@@ -108,7 +135,7 @@ def search(request):
             addmoney = addmoney.filter(Category=category)
 
         addmoney = addmoney.order_by('-Date')
-        return render(request, 'home/tables.html', {'addmoney': addmoney})
+        return render(request, 'home/tables.html', {'addmoney': addmoney, 'expense_categories': EXPENSE_CATEGORIES, 'income_categories': INCOME_CATEGORIES})
     return redirect('home')
 def tables(request):
     if request.session.has_key('is_logged'):
@@ -117,10 +144,13 @@ def tables(request):
         fromdate = request.POST.get('fromdate')
         todate = request.POST.get('todate')
         addmoney = Addmoney_info.objects.filter(user=user).order_by('-Date')
-        return render(request,'home/tables.html',{'addmoney':addmoney})
+        return render(request,'home/tables.html',{'addmoney':addmoney, 'expense_categories': EXPENSE_CATEGORIES, 'income_categories': INCOME_CATEGORIES})
     return redirect('home')
 def addmoney(request):
-    return render(request,'home/addmoney.html')
+    return render(request,'home/addmoney.html',{
+        'category_map': CATEGORY_MAP,
+        'categories': EXPENSE_CATEGORIES,   # Expense is the default selection
+    })
 
 def profile(request):
     if request.session.has_key('is_logged'):
@@ -278,11 +308,21 @@ def addmoney_update(request,id):
         if request.method == "POST":
             add = Addmoney_info.objects.get(id=id)
             add.add_money = request.POST["add_money"]
-            add.quantity = request.POST["quantity"]
+            try:
+                quantity = abs(float(request.POST["quantity"]))
+            except (ValueError, TypeError):
+                messages.error(request, "Please enter a valid amount.")
+                return redirect(f"/expense_edit/{id}")
+            # Expenses are stored as negative numbers, income as positive
+            add.quantity = -quantity if add.add_money == "Expense" else quantity
             new_date = request.POST.get("Date")
             if new_date:
                 add.Date = new_date
-            add.Category = request.POST["Category"]
+            category = request.POST["Category"]
+            if category not in CATEGORY_MAP.get(add.add_money, []):
+                messages.error(request, f"'{category}' is not a valid {add.add_money.lower()} category.")
+                return redirect(f"/expense_edit/{id}")
+            add.Category = category
             add.save()
             messages.success(request, "Transaction updated successfully!")
             return redirect("/index")
@@ -295,7 +335,7 @@ def addmoney_submission(request):
             user1 = User.objects.get(id=user_id)
             add_money = request.POST["add_money"]
             quantity = request.POST["quantity"]
-            Date = request.POST["Date"]
+            Date = request.POST.get("Date") or datetime.date.today()   # empty date -> today
             Category = request.POST["Category"]
 
             try:
@@ -304,6 +344,11 @@ def addmoney_submission(request):
                 messages.error(request, "Please enter a valid amount.")
                 return redirect('/addmoney')
 
+            if Category not in CATEGORY_MAP.get(add_money, []):
+                messages.error(request, f"'{Category}' is not a valid {add_money.lower()} category.")
+                return redirect('/addmoney')
+
+            quantity = abs(quantity)
             if add_money == 'Expense':
                 quantity = -quantity
 
@@ -324,7 +369,11 @@ def expense_edit(request,id):
         addmoney_info = Addmoney_info.objects.get(id=id)
         user_id = request.session["user_id"]
         user1 = User.objects.get(id=user_id)
-        return render(request,'home/expense_edit.html',{'addmoney_info':addmoney_info})
+        return render(request,'home/expense_edit.html',{
+            'addmoney_info': addmoney_info,
+            'category_map': CATEGORY_MAP,
+            'categories': CATEGORY_MAP.get(addmoney_info.add_money, EXPENSE_CATEGORIES),
+        })
     return redirect("/home")  
 
 def expense_delete(request,id):
@@ -335,31 +384,50 @@ def expense_delete(request,id):
         return redirect("/index")
     return redirect("/home")
 
+def _period_range(period):
+    """Calendar period that contains today: 'week', 'month' or 'year'.
+    Future dates inside the period count too (e.g. a trip planned next week)."""
+    today = datetime.date.today()
+    if period == 'week':
+        # date.weekday(): Monday=0 ... Sunday=6
+        days_since_start = (today.weekday() + 1) % 7 if WEEK_STARTS_ON_SUNDAY else today.weekday()
+        start = today - datetime.timedelta(days=days_since_start)
+        end = start + datetime.timedelta(days=6)
+    elif period == 'month':
+        start = today.replace(day=1)
+        end = (start + datetime.timedelta(days=32)).replace(day=1) - datetime.timedelta(days=1)
+    else:
+        start = today.replace(month=1, day=1)
+        end = today.replace(month=12, day=31)
+    return start, end
+
+
+def _category_totals(request, start, end):
+    """Shared by the weekly / monthly / yearly pie charts.
+    ?type=Expense (default) or ?type=Income. Rows are grouped by category and
+    returned as positive numbers."""
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return JsonResponse({'error': 'User not logged in'}, status=401)
+
+    entry_type = request.GET.get('type', 'Expense')
+    if entry_type not in CATEGORY_MAP:
+        entry_type = 'Expense'
+
+    totals = (
+        Addmoney_info.objects
+        .filter(user_id=user_id, add_money=entry_type, Date__range=(start, end))
+        .values('Category')
+        .annotate(total=Sum('quantity'))
+        .order_by('Category')
+    )
+    data = {item['Category']: abs(item['total']) for item in totals}
+    return JsonResponse({'expense_category_data': data, 'type': entry_type})
+
+
 def expense_month(request):
-    todays_date = datetime.date.today()
-    one_month_ago = todays_date-datetime.timedelta(days=30)
-    user_id = request.session["user_id"]
-    user1 = User.objects.get(id=user_id)
-    addmoney = Addmoney_info.objects.filter(user = user1,Date__gte=one_month_ago,Date__lte=todays_date)
-    finalrep ={}
-
-    def get_Category(addmoney_info):
-        # if addmoney_info.add_money=="Expense":
-        return addmoney_info.Category    
-    Category_list = list(set(map(get_Category,addmoney)))
-
-    def get_expense_category_amount(Category,add_money):
-        quantity = 0 
-        filtered_by_category = addmoney.filter(Category = Category,add_money="Expense") 
-        for item in filtered_by_category:
-            quantity+=item.quantity
-        return quantity
-
-    for x in addmoney:
-        for y in Category_list:
-            finalrep[y]= get_expense_category_amount(y,"Expense")
-
-    return JsonResponse({'expense_category_data': finalrep}, safe=False)
+    today = datetime.date.today()
+    return _category_totals(request, *_period_range('month'))
 
 
 def stats(request):
@@ -369,7 +437,8 @@ def stats(request):
         user_id = request.session["user_id"]
         user1 = User.objects.get(id=user_id)
         user_profile, _ = UserProfile.objects.get_or_create(user=user1)
-        addmoney_info = Addmoney_info.objects.filter(user = user1,Date__gte=one_month_ago)
+        month_start, month_end = _period_range('month')
+        addmoney_info = Addmoney_info.objects.filter(user = user1,Date__range=(month_start, month_end))
         sum = 0 
         for i in addmoney_info:
             if i.add_money == 'Expense':
@@ -380,7 +449,7 @@ def stats(request):
             if i.add_money == 'Income':
                 sum1 =sum1+i.quantity
         addmoney_info.sum1 = sum1
-        x= user_profile.Savings+addmoney_info.sum1 - addmoney_info.sum
+        x = _overall_balance(user1)
     
         y = addmoney_info.sum1 + addmoney_info.sum
         z = addmoney_info.sum1 + addmoney_info.sum
@@ -395,39 +464,9 @@ def stats(request):
         return render(request,'home/stats.html',{'addmoney':addmoney_info})
 
 def expense_week(request):
-    todays_date = datetime.date.today()
-    one_week_ago = todays_date - datetime.timedelta(days=7)
-    
-    user_id = request.session.get("user_id")
-    if not user_id:
-        return JsonResponse({'error': 'User not logged in'}, status=401)
+    today = datetime.date.today()
+    return _category_totals(request, *_period_range('week'))
 
-    user1 = User.objects.get(id=user_id)
-
-    # ✅ Filter only last 7 days expenses
-    addmoney = Addmoney_info.objects.filter(
-        user=user1,
-        Date__gte=one_week_ago,
-        Date__lte=todays_date,
-        add_money="Expense"  # Ensure only expense records
-    )
-
-    # If no data found
-    if not addmoney.exists():
-        return JsonResponse({'expense_category_data': {}}, safe=False)
-
-    # ✅ Aggregate total expense per category
-    expense_data = (
-        addmoney.values('Category')
-        .annotate(total_amount=Sum('quantity'))
-        .order_by('Category')
-    )
-
-    # ✅ Convert queryset to dictionary
-    finalrep = {item['Category']: item['total_amount'] for item in expense_data}
-
-    return JsonResponse({'expense_category_data': finalrep}, safe=False)
-    
 def weekly(request):
     if request.session.has_key('is_logged') :
         todays_date = datetime.date.today()
@@ -435,7 +474,8 @@ def weekly(request):
         user_id = request.session["user_id"]
         user1 = User.objects.get(id=user_id)
         user_profile, _ = UserProfile.objects.get_or_create(user=user1)
-        addmoney_info = Addmoney_info.objects.filter(user = user1,Date__gte=one_week_ago)
+        week_start, week_end = _period_range('week')
+        addmoney_info = Addmoney_info.objects.filter(user = user1,Date__range=(week_start, week_end))
         sum = 0 
         for i in addmoney_info:
             if i.add_money == 'Expense':
@@ -446,7 +486,7 @@ def weekly(request):
             if i.add_money == 'Income':
                 sum1 = sum1 + i.quantity
         addmoney_info.sum1 = sum1
-        x= user_profile.Savings+addmoney_info.sum1 - addmoney_info.sum
+        x = _overall_balance(user1)
         y= addmoney_info.sum1   #change line by me
         a= addmoney_info.sum1 + addmoney_info.sum
         z= a
@@ -458,7 +498,8 @@ def weekly(request):
         addmoney_info.x = abs(x)
         addmoney_info.y = abs(y)
         addmoney_info.z = abs(z)
-    return render(request,'home/weekly.html',{'addmoney_info':addmoney_info})
+        return render(request,'home/weekly.html',{'addmoney_info':addmoney_info})
+    return redirect('home')
 
 def check(request):
     if request.method == 'POST':
@@ -485,30 +526,8 @@ def check(request):
     return redirect("/reset_password")
 
 def info_year(request):
-    todays_date = datetime.date.today()
-    one_week_ago = todays_date-datetime.timedelta(days=30*12)
-    user_id = request.session["user_id"]
-    user1 = User.objects.get(id=user_id)
-    addmoney = Addmoney_info.objects.filter(user = user1,Date__gte=one_week_ago)
-    finalrep ={}
-
-    def get_Category(addmoney_info):
-        return addmoney_info.Category
-    Category_list = list(set(map(get_Category,addmoney)))
-
-
-    def get_expense_category_amount(Category,add_money):
-        quantity = 0 
-        filtered_by_category = addmoney.filter(Category = Category,add_money="Expense") 
-        for item in filtered_by_category:
-            quantity+=item.quantity
-        return quantity
-
-    for x in addmoney:
-        for y in Category_list:
-            finalrep[y]= get_expense_category_amount(y,"Expense")
-
-    return JsonResponse({'expense_category_data': finalrep}, safe=False)
+    today = datetime.date.today()
+    return _category_totals(request, *_period_range('year'))
 
 def info(request):
     return render(request,'home/info.html')
@@ -560,22 +579,19 @@ def dashboard(request):
 
     # Weekly expenses
     today = date.today()
-    week_start = today - datetime.timedelta(days=7)  # Monday
-    weekly_transactions = transactions.filter(Date__gte=week_start)
+    weekly_transactions = transactions.filter(Date__range=_period_range('week'))
     weekly_expense = weekly_transactions.filter(add_money='Expense').values('Category').annotate(total=Sum('quantity'))
-    weekly_expense_json = {item['Category']: item['total'] for item in weekly_expense}
+    weekly_expense_json = {item['Category']: abs(item['total']) for item in weekly_expense}
 
     # Monthly expenses
-    month_start = today.replace(day=1)
-    monthly_transactions = transactions.filter(Date__gte=month_start)
+    monthly_transactions = transactions.filter(Date__range=_period_range('month'))
     monthly_expense = monthly_transactions.filter(add_money='Expense').values('Category').annotate(total=Sum('quantity'))
-    monthly_expense_json = {item['Category']: item['total'] for item in monthly_expense}
+    monthly_expense_json = {item['Category']: abs(item['total']) for item in monthly_expense}
 
     # Yearly expenses
-    year_start = today.replace(month=1, day=1)
-    yearly_transactions = transactions.filter(Date__gte=year_start)
+    yearly_transactions = transactions.filter(Date__range=_period_range('year'))
     yearly_expense = yearly_transactions.filter(add_money='Expense').values('Category').annotate(total=Sum('quantity'))
-    yearly_expense_json = {item['Category']: item['total'] for item in yearly_expense}
+    yearly_expense_json = {item['Category']: abs(item['total']) for item in yearly_expense}
 
     context = {
         'page_obj': page_obj,

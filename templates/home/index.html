@@ -131,9 +131,10 @@
 
                 <div class="card-wallet">
                     <h4>My Wallet</h4>
+                    <p>Starting amount: {{ starting_amount|floatformat:"-2" }}</p>
                     <p>Total Income: {{ total_income }}</p>
                     <p>Total Expense: {{ total_expense }}</p>
-                    <p>Balance: {{ current_income }}</p>
+                    <p>Balance: {{ current_income|floatformat:"-2" }}</p>
                     <div style="display:flex; align-items:center; gap:12px;">
                         <span class="add-btn" title="Add" onclick="location.href='{% url 'addmoney' %}'" role="button" aria-label="Add Expense or Income">
                             <i class="fas fa-plus-circle"></i>

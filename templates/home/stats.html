@@ -123,6 +123,17 @@
                                 </div>
                                 </div>
                             </div>
+                            <div class="col-lg-6">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <i class="fas fa-chart-pie mr-1"></i>
+                                        Monthly Income
+                                    </div>
+                                    <div class="container" style="width:100%;">
+                                    <div class="card-body"><canvas id="incomeChart" width="400" height="400"></canvas></div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="col-lg-6 ">
                                 <div class="card mb-4">
                                     <div class="card-header">
@@ -145,11 +156,11 @@
                 </main>
             </div>
         </div>
+<script src="{% static 'javascript/category_charts.js' %}"></script>
 <script src="{% static 'javascript/stats.js'%}"></script>
 <script src="{% static 'javascript/scripts.js' %}"></script>
 <script src="https://code.jquery.com/jquery-3.5.1.min.js" crossorigin="anonymous"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.datatables.net/1.10.20/js/jquery.dataTables.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.datatables.net/1.10.20/js/dataTables.bootstrap4.min.js" crossorigin="anonymous"></script>
     </body>

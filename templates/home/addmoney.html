@@ -34,31 +34,17 @@
 
                       <div class="form-check">
                         What you want to add?<br />
-                        <label class="form-check-label" for="add_money">
-                          <input
-                            class="form-check-input"
-                            type="radio"
-                            name="add_money"
-                            id="add_money"
-                            value="Expense"
-                            checked
-                            required
-                          />
+                        <label class="form-check-label" for="add_money_expense">
+                          <input class="form-check-input" type="radio" name="add_money"
+                            id="add_money_expense" value="Expense" checked required />
                           Expense
                         </label>
 
-                        <label class="form-check-label" for="add_money">
-                          <input
-                            class="form-check-input"
-                            type="radio"
-                            name="add_money"
-                            id="add_money"
-                            value="Income"
-                            checked
-                            required
-                          />
-                          Income</label
-                        >
+                        <label class="form-check-label" for="add_money_income">
+                          <input class="form-check-input" type="radio" name="add_money"
+                            id="add_money_income" value="Income" required />
+                          Income
+                        </label>
                       </div>
 
                       <div>
@@ -77,29 +63,15 @@
                       <div>
                         <label>
                           Expense Date:
-                          <input type="date" name="Date" /> </label
+                          <input type="date" name="Date" required /> </label
                         ><br />
                       </div>
                       <div>
                         <div class="f1">
                           Select category-<br />
                           <select class="Category" name="Category" required>
-                            <br />
-                            <option value="Food">Food</option>
-                            <option value="Travel">Travel</option>
-                            <option value="Shopping">shopping</option>
-                            <option value="Necessities">Necessities</option>
-                            <option value="Entertainment">Entertainment</option>
-                            <option value="Rent">Rent</option>
-                            <option value="Healthcare">Healthcare</option>
-                            <option value="Groceries">Groceries</option>
-                            <option value="Bills">Bills</option>
-                            <option value="Salary">Salary</option>
-                            <option value="Gift">Gift</option>
-                            <option value="Investment">Investment</option>
-                            <option value="Others">Others</option>
-                          </select
-                        ><br />
+                            {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+                          </select><br />
                       </div>
                       <div class="btn">
                         <button type="submit" class="b2" href="/addmoney">
@@ -116,5 +88,27 @@
         </div>
       </div>
     </div>
+  {{ category_map|json_script:"category-map" }}
+<script>
+  // Swap the category list when Expense / Income is chosen
+  (function () {
+    var map = JSON.parse(document.getElementById('category-map').textContent);
+    var select = document.querySelector('select[name="Category"]');
+    var radios = document.querySelectorAll('input[name="add_money"]');
+    function fill(type) {
+      var current = select.value;
+      select.innerHTML = '';
+      (map[type] || []).forEach(function (c) {
+        var o = document.createElement('option');
+        o.value = c; o.textContent = c;
+        if (c === current) o.selected = true;
+        select.appendChild(o);
+      });
+    }
+    radios.forEach(function (r) {
+      r.addEventListener('change', function () { if (r.checked) fill(r.value); });
+    });
+  })();
+</script>
   </body>
 </html>

@@ -42,7 +42,7 @@
   <input type="radio" name="add_money" value="Income">
   <label for="Income">Income</label><br>-->
   <label for="quantity">Amount:</label><br>
-  <input type="number" name="quantity" value="{{addmoney_info.quantity}}"required><br>
+  <input type="number" name="quantity" min="1" value="{{ addmoney_info.quantity|cut:'-' }}" required><br>
   <br>
   <label>
     Expense Date:
@@ -50,16 +50,8 @@
   </label><br>
 	<div class="f1">
 		Select category-<br>
-	<select class="Category" name="Category" value="{{addmoney_info.Category}}" required><br>
- <option value="Food">Food</option>
-  <option value="Travel">Travel</option>
-  <option value="Shopping">shopping</option>
-  <option value="Necessities">Necessities</option>
-  <option value="Entertainment">Entertainment</option>
-  <option value="Salary">Salary</option>
-  <option value="Gift">Gift</option>
-  <option value="Investment">Investment</option>
-  <option value="Others">Others</option>
+	<select class="Category" name="Category" required>
+  {% for c in categories %}<option value="{{ c }}"{% if c == addmoney_info.Category %} selected{% endif %}>{{ c }}</option>{% endfor %}
 </select><br>
 																	</div>
   <button type="submit" class="b2"> Save </button>
@@ -69,5 +61,27 @@
 											
 													</div>
 											</div></div></main></div></div></form>
+    {{ category_map|json_script:"category-map" }}
+<script>
+  // Swap the category list when Expense / Income is chosen
+  (function () {
+    var map = JSON.parse(document.getElementById('category-map').textContent);
+    var select = document.querySelector('select[name="Category"]');
+    var radios = document.querySelectorAll('input[name="add_money"]');
+    function fill(type) {
+      var current = select.value;
+      select.innerHTML = '';
+      (map[type] || []).forEach(function (c) {
+        var o = document.createElement('option');
+        o.value = c; o.textContent = c;
+        if (c === current) o.selected = true;
+        select.appendChild(o);
+      });
+    }
+    radios.forEach(function (r) {
+      r.addEventListener('change', function () { if (r.checked) fill(r.value); });
+    });
+  })();
+</script>
     </body>
 </html>
